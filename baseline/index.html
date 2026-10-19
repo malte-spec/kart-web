@@ -100,12 +100,12 @@ body {
 	z-index: 1;
 }
 		</style>
-		<link id="-gd-engine-icon" rel="icon" type="image/png" href="index.b738c3f.icon.png" />
-<link rel="apple-touch-icon" href="index.b738c3f.apple-touch-icon.png"/>
+		<link id="-gd-engine-icon" rel="icon" type="image/png" href="index.ec3a79d.icon.png" />
+<link rel="apple-touch-icon" href="index.ec3a79d.apple-touch-icon.png"/>
 
 	</head>
 	<body>
-<a hidden id="published-version" href="version.txt?v=b738c3f">version.txt</a>
+<a hidden id="published-version" href="version.txt?v=ec3a79d">version.txt</a>
 		<canvas id="canvas" tabindex="0">
 			Your browser does not support the canvas tag.
 		</canvas>
@@ -115,14 +115,14 @@ body {
 		</noscript>
 
 		<div id="status">
-			<img id="status-splash" class="show-image--true fullsize--true use-filter--true" src="index.b738c3f.png" alt="">
+			<img id="status-splash" class="show-image--true fullsize--true use-filter--true" src="index.ec3a79d.png" alt="">
 			<progress id="status-progress"></progress>
 			<div id="status-notice"></div>
 		</div>
 
-		<script src="index.b738c3f.js"></script>
+		<script src="index.ec3a79d.js"></script>
 		<script>
-const GODOT_CONFIG = {"args":[],"canvasResizePolicy":0,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":false,"executable":"index.b738c3f","experimentalVK":false,"fileSizes":{"index.b738c3f.pck":6944,"index.b738c3f.wasm":39514754},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4,"mainPack":"index.b738c3f.pck"};
+const GODOT_CONFIG = {"args":[],"canvasResizePolicy":0,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":false,"executable":"index.ec3a79d","experimentalVK":false,"fileSizes":{"index.ec3a79d.pck":7584,"index.ec3a79d.wasm":39514754},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4,"mainPack":"index.ec3a79d.pck"};
 const GODOT_THREADS_ENABLED = false;
 const engine = new Engine(GODOT_CONFIG);
 
@@ -206,6 +206,71 @@ const engine = new Engine(GODOT_CONFIG);
 		return b;
 	}
 
+	// The browser reports "WebKit WebGL" unless this extension is present.
+	// An empty result lets Godot use RenderingServer.get_video_adapter_name().
+	function unmaskedRenderer(gl) {
+		if (!gl) {
+			return '';
+		}
+		var ext = gl.getExtension('WEBGL_debug_renderer_info');
+		if (ext) {
+			var name = gl.getParameter(ext.UNMASKED_RENDERER_WEBGL);
+			if (name) {
+				return String(name);
+			}
+		}
+		var masked = gl.getParameter(gl.RENDERER);
+		return masked ? String(masked) : '';
+	}
+
+	function releaseTemporaryContext(gl) {
+		if (!gl || !gl.getExtension) {
+			return;
+		}
+		var lose = gl.getExtension('WEBGL_lose_context');
+		if (lose && lose.loseContext) {
+			lose.loseContext();
+		}
+	}
+
+	// Prefer the context Godot already created. A temporary one is released
+	// immediately so Chrome does not drop the game context after 16.
+	function rendererFromCanvas(canvas, temporary) {
+		if (!canvas || !canvas.getContext) {
+			return '';
+		}
+		var gl = canvas.getContext('webgl2') || canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+		if (!gl) {
+			return '';
+		}
+		var name = '';
+		try {
+			name = unmaskedRenderer(gl) || '';
+		} catch (err) {
+			name = '';
+		}
+		if (temporary) {
+			releaseTemporaryContext(gl);
+		}
+		return name;
+	}
+
+	function cachedUnmaskedRenderer() {
+		if (typeof window.skateRendererName === 'string') {
+			return window.skateRendererName;
+		}
+		var name = '';
+		var canvas = document.getElementById('canvas');
+		if (canvas) {
+			name = rendererFromCanvas(canvas, false);
+		}
+		if (!name) {
+			name = rendererFromCanvas(document.createElement('canvas'), true);
+		}
+		window.skateRendererName = name || '';
+		return window.skateRendererName;
+	}
+
 	function fitCanvas() {
 		var canvas = document.getElementById('canvas');
 		if (!canvas) {
@@ -236,6 +301,14 @@ const engine = new Engine(GODOT_CONFIG);
 		}
 		canvas.focus();
 	}
+
+	window.skateUnmaskedRenderer = function () {
+		try {
+			return cachedUnmaskedRenderer();
+		} catch (err) {
+			return '';
+		}
+	};
 
 	const missing = Engine.getMissingFeatures({
 		threads: GODOT_THREADS_ENABLED,
