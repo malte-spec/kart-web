@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-build="cb72efc">
 	<head>
 		<meta charset="utf-8">
 		<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -100,12 +100,12 @@ body {
 	z-index: 1;
 }
 		</style>
-		<link id="-gd-engine-icon" rel="icon" type="image/png" href="index.2ba5924.icon.png" />
-<link rel="apple-touch-icon" href="index.2ba5924.apple-touch-icon.png"/>
+		<link id="-gd-engine-icon" rel="icon" type="image/png" href="index.cb72efc.icon.png" />
+<link rel="apple-touch-icon" href="index.cb72efc.apple-touch-icon.png"/>
 
 	</head>
 	<body>
-<a hidden id="published-version" href="version.txt?v=2ba5924">version.txt</a>
+<a hidden id="published-version" href="version.txt?v=cb72efc">version.txt</a>
 		<canvas id="canvas" tabindex="0">
 			Your browser does not support the canvas tag.
 		</canvas>
@@ -115,14 +115,14 @@ body {
 		</noscript>
 
 		<div id="status">
-			<img id="status-splash" class="show-image--true fullsize--true use-filter--true" src="index.2ba5924.png" alt="">
+			<img id="status-splash" class="show-image--true fullsize--true use-filter--true" src="index.cb72efc.png" alt="">
 			<progress id="status-progress"></progress>
 			<div id="status-notice"></div>
 		</div>
 
-		<script src="index.2ba5924.js"></script>
+		<script src="index.cb72efc.js"></script>
 		<script>
-const GODOT_CONFIG = {"args":[],"canvasResizePolicy":0,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":false,"executable":"index.2ba5924","experimentalVK":false,"fileSizes":{"index.2ba5924.pck":885864,"index.2ba5924.wasm":39514754},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4,"mainPack":"index.2ba5924.pck"};
+const GODOT_CONFIG = {"args":[],"canvasResizePolicy":0,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":false,"executable":"index.cb72efc","experimentalVK":false,"fileSizes":{"index.cb72efc.pck":885864,"index.cb72efc.wasm":39514754},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4,"mainPack":"index.cb72efc.pck"};
 const GODOT_THREADS_ENABLED = false;
 const engine = new Engine(GODOT_CONFIG);
 
@@ -355,6 +355,120 @@ const engine = new Engine(GODOT_CONFIG);
 		// Hand the page query to the engine before the first script runs. JavaScriptBridge can still be empty in autoload _ready.
 		// Each pair is its own user arg, then the raw search. A cache-bust `&v=` or an `&` split
 		// must not drop `spot`. Godot keeps arguments after `--` for OS.get_cmdline_user_args().
+		function liveSha(text) {
+			var word = String(text || '').trim().split(/\s+/)[0] || '';
+			return word;
+		}
+
+		function buildIsCurrent(baked, liveText) {
+			if (!baked) {
+				return true;
+			}
+			var live = liveSha(liveText);
+			if (!live) {
+				return true;
+			}
+			return live === baked;
+		}
+
+		function searchAfterReload(search, live) {
+			var raw = search.charAt(0) === '?' ? search.slice(1) : search;
+			var params = new URLSearchParams(raw);
+			params.set('reload', live);
+			return '?' + params.toString();
+		}
+
+		// GitHub Pages keeps index.html for about 10 minutes. A stale copy still has the old
+		// data-build, so compare it with version.txt and reload that URL once. The query stays.
+		function searchAfterWorkerDrop(search) {
+			var raw = search.charAt(0) === '?' ? search.slice(1) : search;
+			var params = new URLSearchParams(raw);
+			params.set('worker', 'off');
+			return '?' + params.toString();
+		}
+
+		// Godot registers a service worker when one is configured. A worker left on this
+		// origin keeps the previous pck for a single query, so ?players=4 can stay on an
+		// old stamp after ?fps=1&test=1 has already moved on. This export does not use one.
+		function dropServiceWorkers(done) {
+			if (!navigator.serviceWorker || !navigator.serviceWorker.getRegistrations) {
+				done(false);
+				return;
+			}
+			navigator.serviceWorker.getRegistrations().then(function (regs) {
+				if (!regs || !regs.length) {
+					done(false);
+					return;
+				}
+				return Promise.all(regs.map(function (reg) {
+					return reg.unregister();
+				})).then(function () {
+					if (!window.caches || !caches.keys) {
+						return;
+					}
+					return caches.keys().then(function (keys) {
+						return Promise.all(keys.map(function (key) {
+							return caches.delete(key);
+						}));
+					});
+				}).then(function () {
+					done(true);
+				});
+			}).catch(function () {
+				done(false);
+			});
+		}
+
+		function startWhenBuildIsCurrent(start) {
+			var baked = document.documentElement.getAttribute('data-build') || '';
+			var params = new URLSearchParams(window.location.search);
+			dropServiceWorkers(function (dropped) {
+				if (dropped && params.get('worker') !== 'off') {
+					window.location.replace(window.location.pathname + searchAfterWorkerDrop(window.location.search) + window.location.hash);
+					return;
+				}
+				startWhenBuildIsCurrentAfterWorker(baked, params, start);
+			});
+		}
+
+		function startWhenBuildIsCurrentAfterWorker(baked, params, start) {
+			// reload= already means this URL was fetched once. A stale cached copy of that
+			// same address must start, or Pages keeps handing it back for about 10 minutes.
+			if (!baked || params.has('reload')) {
+				start();
+				return;
+			}
+			var started = false;
+			function go() {
+				if (started) {
+					return;
+				}
+				started = true;
+				start();
+			}
+			var timer = setTimeout(go, 1500);
+			fetch('version.txt?t=' + Date.now(), { cache: 'no-store' }).then(function (response) {
+				return response.ok ? response.text() : '';
+			}).then(function (text) {
+				if (started) {
+					return;
+				}
+				var live = liveSha(text);
+				if (!buildIsCurrent(baked, text) && live) {
+					clearTimeout(timer);
+					started = true;
+					window.location.replace(window.location.pathname + searchAfterReload(window.location.search, live) + window.location.hash);
+					return;
+				}
+				clearTimeout(timer);
+				go();
+			}).catch(function () {
+				clearTimeout(timer);
+				go();
+			});
+		}
+
+		startWhenBuildIsCurrent(function () {
 		const pageSearch = window.location.search;
 		if (pageSearch) {
 			engine.config.args.push('--');
@@ -381,6 +495,7 @@ const engine = new Engine(GODOT_CONFIG);
 			focusCanvas();
 			requestAnimationFrame(focusCanvas);
 		}, displayFailureNotice);
+		});
 	}
 }());
 		</script>
