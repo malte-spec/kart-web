@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" data-build="4f44fcb">
+<html lang="en" data-build="9e20087">
 	<head>
 		<meta charset="utf-8">
 		<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -100,12 +100,12 @@ body {
 	z-index: 1;
 }
 		</style>
-		<link id="-gd-engine-icon" rel="icon" type="image/png" href="index.4f44fcb.icon.png" />
-<link rel="apple-touch-icon" href="index.4f44fcb.apple-touch-icon.png"/>
+		<link id="-gd-engine-icon" rel="icon" type="image/png" href="index.9e20087.icon.png" />
+<link rel="apple-touch-icon" href="index.9e20087.apple-touch-icon.png"/>
 
 	</head>
 	<body>
-<a hidden id="published-version" href="version.txt?v=4f44fcb">version.txt</a>
+<a hidden id="published-version" href="version.txt?v=9e20087">version.txt</a>
 		<canvas id="canvas" tabindex="0">
 			Your browser does not support the canvas tag.
 		</canvas>
@@ -115,16 +115,15 @@ body {
 		</noscript>
 
 		<div id="status">
-			<img id="status-splash" class="show-image--true fullsize--true use-filter--true" src="index.4f44fcb.png" alt="">
+			<img id="status-splash" class="show-image--true fullsize--true use-filter--true" src="index.9e20087.png" alt="">
 			<progress id="status-progress"></progress>
 			<div id="status-notice"></div>
 		</div>
 
-		<script src="index.4f44fcb.js"></script>
 		<script>
-const GODOT_CONFIG = {"args":[],"canvasResizePolicy":0,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":false,"executable":"index.4f44fcb","experimentalVK":false,"fileSizes":{"index.4f44fcb.pck":9828,"index.4f44fcb.wasm":39514754},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4,"mainPack":"index.4f44fcb.pck"};
+const GODOT_CONFIG = {"args":[],"canvasResizePolicy":0,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":false,"executable":"index.9e20087","experimentalVK":false,"fileSizes":{"index.9e20087.pck":9828,"index.9e20087.wasm":39514754},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4,"mainPack":"index.9e20087.pck"};
 const GODOT_THREADS_ENABLED = false;
-const engine = new Engine(GODOT_CONFIG);
+const BAKED_ENGINE_SCRIPT = 'index.9e20087.js';
 
 (function () {
 	const statusOverlay = document.getElementById('status');
@@ -310,6 +309,15 @@ const engine = new Engine(GODOT_CONFIG);
 		}
 	};
 
+	setStatusMode('progress');
+	fitCanvas();
+	window.addEventListener('resize', fitCanvas);
+	if (window.visualViewport) {
+		window.visualViewport.addEventListener('resize', fitCanvas);
+	}
+
+	function runEngine() {
+	const engine = new Engine(GODOT_CONFIG);
 	const missing = Engine.getMissingFeatures({
 		threads: GODOT_THREADS_ENABLED,
 	});
@@ -346,15 +354,13 @@ const engine = new Engine(GODOT_CONFIG);
 			displayFailureNotice(missingMsg + missing.join('\n'));
 		}
 	} else {
-		setStatusMode('progress');
-		fitCanvas();
-		window.addEventListener('resize', fitCanvas);
-		if (window.visualViewport) {
-			window.visualViewport.addEventListener('resize', fitCanvas);
-		}
-		// Hand the page query to the engine before the first script runs. JavaScriptBridge can still be empty in autoload _ready.
-		// Each pair is its own user arg, then the raw search. A cache-bust `&v=` or an `&` split
-		// must not drop `spot`. Godot keeps arguments after `--` for OS.get_cmdline_user_args().
+		bootGame(engine);
+	}
+	}
+
+	// Hand the page query to the engine before the first script runs. JavaScriptBridge can still be empty in autoload _ready.
+	// Each pair is its own user arg, then the raw search. A cache-bust `&v=` or an `&` split
+	// must not drop `spot`. Godot keeps arguments after `--` for OS.get_cmdline_user_args().
 		function liveSha(text) {
 			var word = String(text || '').trim().split(/\s+/)[0] || '';
 			return word;
@@ -371,11 +377,93 @@ const engine = new Engine(GODOT_CONFIG);
 			return live === baked;
 		}
 
-		function searchAfterReload(search, live) {
+		function searchWith(search, live, dropWorker) {
 			var raw = search.charAt(0) === '?' ? search.slice(1) : search;
 			var params = new URLSearchParams(raw);
-			params.set('reload', live);
-			return '?' + params.toString();
+			if (live) {
+				params.set('reload', live);
+			}
+			if (dropWorker) {
+				params.set('worker', 'off');
+			}
+			var query = params.toString();
+			return query ? '?' + query : '';
+		}
+
+		function searchAfterReload(search, live) {
+			return searchWith(search, live, false);
+		}
+
+		// Pages caches index.html, version.txt, and the engine files for about 10 minutes.
+		// One navigation is allowed. If that document is still the previous build, load the
+		// published engine files instead of starting the stale pack.
+		function publishAction(baked, liveText, params, droppedWorker) {
+			var live = liveSha(liveText);
+			var stale = !!(baked && live && live !== baked);
+			var needWorkerNav = !!(droppedWorker && params.get('worker') !== 'off');
+			if (stale && params.get('reload') !== live) {
+				return { action: 'reload', live: live, worker: needWorkerNav };
+			}
+			if (needWorkerNav) {
+				return { action: 'reload', live: live || baked, worker: true };
+			}
+			if (stale) {
+				return { action: 'retarget', live: live, worker: false };
+			}
+			return { action: 'start', live: live || baked, worker: false };
+		}
+
+		function sameQuery(a, b) {
+			var left = new URLSearchParams(a.charAt(0) === '?' ? a.slice(1) : a);
+			var right = new URLSearchParams(b.charAt(0) === '?' ? b.slice(1) : b);
+			var keys = {};
+			left.forEach(function (_value, key) { keys[key] = true; });
+			right.forEach(function (_value, key) { keys[key] = true; });
+			for (var key in keys) {
+				if (left.get(key) !== right.get(key)) {
+					return false;
+				}
+			}
+			return true;
+		}
+
+		function applyPublishDecision(search, baked, liveText, droppedWorker) {
+			var raw = search.charAt(0) === '?' ? search.slice(1) : search;
+			var params = new URLSearchParams(raw);
+			var decision = publishAction(baked, liveText, params, droppedWorker);
+			var sha = decision.live || baked;
+			if (decision.action === 'reload') {
+				var next = searchWith(search, decision.live, decision.worker);
+				if (!sameQuery(search, next)) {
+					return { navigate: next, executable: '', mainPack: '', bust: '' };
+				}
+				if (baked && sha && baked !== sha) {
+					decision = { action: 'retarget', live: sha };
+				}
+			}
+			if (decision.action === 'retarget' && sha) {
+				return {
+					navigate: '',
+					executable: 'index.' + sha,
+					mainPack: 'index.' + sha + '.pck',
+					bust: sha,
+				};
+			}
+			return { navigate: '', executable: '', mainPack: '', bust: sha };
+		}
+
+		function bustEngineUrl(url, sha) {
+			var text = String(url || '');
+			var name = 'index.' + sha + '.';
+			if (!sha || text.indexOf(name) !== 0 || text.indexOf('?v=') !== -1) {
+				return text;
+			}
+			return text + '?v=' + sha;
+		}
+
+		function engineScriptUrl(bakedScript, executable, sha) {
+			var name = executable ? executable + '.js' : String(bakedScript || '');
+			return bustEngineUrl(name, sha);
 		}
 
 		// GitHub Pages keeps index.html for about 10 minutes. A stale copy still has the old
@@ -419,56 +507,94 @@ const engine = new Engine(GODOT_CONFIG);
 			});
 		}
 
-		function startWhenBuildIsCurrent(start) {
-			var baked = document.documentElement.getAttribute('data-build') || '';
-			var params = new URLSearchParams(window.location.search);
-			dropServiceWorkers(function (dropped) {
-				if (dropped && params.get('worker') !== 'off') {
-					window.location.replace(window.location.pathname + searchAfterWorkerDrop(window.location.search) + window.location.hash);
-					return;
-				}
-				startWhenBuildIsCurrentAfterWorker(baked, params, start);
-			});
-		}
+		var freshEngine = null;
 
-		function startWhenBuildIsCurrentAfterWorker(baked, params, start) {
-			// reload= already means this URL was fetched once. A stale cached copy of that
-			// same address must start, or Pages keeps handing it back for about 10 minutes.
-			if (!baked || params.has('reload')) {
-				start();
+		function installFetchBust(sha) {
+			if (!sha || window.__skateFetchBust === sha || typeof window.fetch !== 'function') {
 				return;
 			}
-			var started = false;
-			function go() {
-				if (started) {
+			window.__skateFetchBust = sha;
+			var orig = window.fetch.bind(window);
+			window.fetch = function (input, init) {
+				if (typeof input === 'string') {
+					input = bustEngineUrl(input, sha);
+				}
+				return orig(input, init);
+			};
+		}
+
+		function startWhenBuildIsCurrent(start) {
+			var baked = document.documentElement.getAttribute('data-build') || '';
+			var decided = false;
+			var dropped = false;
+			var dropReady = false;
+			var versionText = '';
+			var versionReady = false;
+			function finish() {
+				if (decided || !dropReady || !versionReady) {
 					return;
 				}
-				started = true;
+				decided = true;
+				clearTimeout(timer);
+				var plan = applyPublishDecision(window.location.search, baked, versionText, dropped);
+				if (plan.navigate) {
+					window.location.replace(window.location.pathname + plan.navigate + window.location.hash);
+					return;
+				}
+				if (plan.executable) {
+					freshEngine = {
+						executable: plan.executable,
+						mainPack: plan.mainPack,
+					};
+				}
+				if (plan.bust) {
+					installFetchBust(plan.bust);
+				}
 				start();
 			}
-			var timer = setTimeout(go, 1500);
-			fetch('version.txt?t=' + Date.now(), { cache: 'no-store' }).then(function (response) {
+			// getRegistrations() can stall. The same 1.5s bound covers version.txt and the
+			// worker cleanup, so a hung worker still lets the baked build start.
+			var timer = setTimeout(function () {
+				versionReady = true;
+				dropReady = true;
+				finish();
+			}, 1500);
+			dropServiceWorkers(function (didDrop) {
+				dropped = didDrop;
+				dropReady = true;
+				finish();
+			});
+			// cache: 'no-store' skips the browser cache. The query skips a Pages entry
+			// that ignores the request cache mode and keeps version.txt for 10 minutes.
+			// A reload= already on the URL does not skip this fetch.
+			fetch('version.txt?t=' + Date.now(), {
+				cache: 'no-store',
+				headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' },
+			}).then(function (response) {
 				return response.ok ? response.text() : '';
 			}).then(function (text) {
-				if (started) {
-					return;
-				}
-				var live = liveSha(text);
-				if (!buildIsCurrent(baked, text) && live) {
-					clearTimeout(timer);
-					started = true;
-					window.location.replace(window.location.pathname + searchAfterReload(window.location.search, live) + window.location.hash);
-					return;
-				}
-				clearTimeout(timer);
-				go();
+				versionText = text;
+				versionReady = true;
+				finish();
 			}).catch(function () {
-				clearTimeout(timer);
-				go();
+				versionReady = true;
+				finish();
 			});
 		}
 
-		startWhenBuildIsCurrent(function () {
+		function loadEngineScript(src, done) {
+			var script = document.createElement('script');
+			script.src = src;
+			script.onload = function () {
+				done();
+			};
+			script.onerror = function () {
+				displayFailureNotice('The game engine did not load.');
+			};
+			document.body.appendChild(script);
+		}
+
+		function bootGame(engine) {
 		const pageSearch = window.location.search;
 		if (pageSearch) {
 			engine.config.args.push('--');
@@ -488,6 +614,8 @@ const engine = new Engine(GODOT_CONFIG);
 					statusProgress.removeAttribute('max');
 				}
 			},
+			'executable': freshEngine ? freshEngine.executable : undefined,
+			'mainPack': freshEngine ? freshEngine.mainPack : undefined,
 		}).then(() => {
 			setStatusMode('hidden');
 			fitCanvas();
@@ -495,8 +623,13 @@ const engine = new Engine(GODOT_CONFIG);
 			focusCanvas();
 			requestAnimationFrame(focusCanvas);
 		}, displayFailureNotice);
+		}
+
+		startWhenBuildIsCurrent(function () {
+			var sha = window.__skateFetchBust || '';
+			var executable = freshEngine ? freshEngine.executable : '';
+			loadEngineScript(engineScriptUrl(BAKED_ENGINE_SCRIPT, executable, sha), runEngine);
 		});
-	}
 }());
 		</script>
 	</body>
