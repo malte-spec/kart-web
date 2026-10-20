@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://c2kc1es0fk0i7"
-path="res://.godot/imported/index.29dad5c.icon.png-352167ce6beba204d50d961e4ae500f0.ctex"
+uid="uid://c48qmki0nvsad"
+path="res://.godot/imported/index.dd050df.apple-touch-icon.png-db2e9a9356c1a9327cb7d2544c7d8630.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://build/web/baseline/index.29dad5c.icon.png"
-dest_files=["res://.godot/imported/index.29dad5c.icon.png-352167ce6beba204d50d961e4ae500f0.ctex"]
+source_file="res://build/web/index.dd050df.apple-touch-icon.png"
+dest_files=["res://.godot/imported/index.dd050df.apple-touch-icon.png-db2e9a9356c1a9327cb7d2544c7d8630.ctex"]
 
 [params]
 
